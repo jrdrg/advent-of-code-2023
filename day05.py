@@ -353,7 +353,7 @@ def part1():
 def part2():
     (seeds, maps) = parse_input(lines)
     ranges = get_seed_ranges(seeds)
-    min_val = 9999999
+    min_val = 9e99
     intersections = seed_range_intersections(ranges, maps)
     merged = merge_ranges(intersections)
     for r in merged:
@@ -361,7 +361,7 @@ def part2():
         for seed in r:
             val = seed_location(seed, maps)
             min_val = min(val, min_val)
-        print("Completed", r)
+        print("Completed", r, "minval", min_val)
     return min_val
 
 print("Part 1", part1())
