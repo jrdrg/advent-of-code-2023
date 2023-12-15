@@ -1035,63 +1035,113 @@ def parse_input(lines: list[str]) -> list[ConditionRecord]:
         records.append(ConditionRecord(conditions, groups))
     return records
 
+cache = {}
+
+def get_springs_from_end(s: str):
+    springs = []
+    chars = list(s)
+    if len(chars) == 0:
+        return ()
+    last_char = chars.pop()
+    springs.append(last_char)
+    while(last_char == "#" and len(chars) > 0):
+        last_char = chars.pop()
+        springs.append(last_char)
+    return tuple(springs)
+
+
 def get_valid_arrangements(conditions: list[str], groups: list[int], s: str = ""):
     min_remaining = functools.reduce(util.add, groups, 0) + (len(groups) - 1)
     
+    key = (tuple(conditions), tuple(groups), get_springs_from_end(s))
+    e = cache.get(key)
+    if e != None:
+        return e
+    
     if min_remaining > len(conditions):
-        return []
+        return 0
 
     if (len(conditions) == 0):
-        return [s]
+        return 1
+
 
     c_slice = slice(1, len(conditions))
     remaining = conditions[c_slice]
     
     g_slice = slice(1, len(groups))
     
+
     match (conditions[0], groups):
         case (".", []) | (".", [0, *_]):
             # continue
-            return get_valid_arrangements(remaining, groups[g_slice], s + ".")
+            r = get_valid_arrangements(remaining, groups[g_slice], s + ".")
+            cache[key] = r
+            return r
 
         case (".", n_g):
             if s.endswith("#"):
-                return []
+                cache[key] = 0
+                return 0
 
-            return get_valid_arrangements(remaining, n_g, s + ".")
+            r = get_valid_arrangements(remaining, n_g, s + ".")
+            cache[key] = r
+            return r
 
         case ("#", []) | ("#", [0, *_]):
             # invalid
-            return []
+            cache[key] = 0
+            return 0
         
         case ("#", [n, *rest]) if n > 0:
             n -= 1
             g = [n, *rest]
-            return get_valid_arrangements(remaining, g, s + "#")
+            r = get_valid_arrangements(remaining, g, s + "#")
+            cache[key] = r
+            return r
 
         case ("?", []):
             l1 = [".", *remaining]
-            r = []
-            r.extend(get_valid_arrangements(l1, groups, s))
+            r =  get_valid_arrangements(l1, groups, s)
+            cache[key] = r
             return r
 
         case ("?", [n, *_]):
             l1 = [".", *remaining]
             l2 = ["#", *remaining]
 
-            r = []
-            r.extend(get_valid_arrangements(l1, groups, s))
-            r.extend(get_valid_arrangements(l2, groups, s))
+            r = 0
+            r += get_valid_arrangements(l1, groups, s)
+            r += get_valid_arrangements(l2, groups, s)
+
+            cache[key] = r
             return r
 
         case _:
             raise ValueError("Invalid state: " + conditions[0] + " groups: " + groups.__repr__())
 
+def unfold_record(record: ConditionRecord) -> ConditionRecord:
+    conditions = []
+    groups = []
+    for _ in range(0, 4):
+        conditions.extend(record.conditions)
+        conditions.extend(["?"])
+        groups.extend(record.groups)
+    conditions.extend(record.conditions)
+    groups.extend(record.groups)
+    return ConditionRecord(conditions, groups)
 
 
 def part1():
+    cache.clear()
     records = parse_input(lines)
-    arrangements = [len(get_valid_arrangements(r.conditions, r.groups)) for r in records]
+    arrangements = [get_valid_arrangements(r.conditions, r.groups) for r in records]
+    return functools.reduce(util.add, arrangements)
+
+def part2():
+    cache.clear()
+    records = [unfold_record(r) for r in parse_input(lines)]
+    arrangements = [get_valid_arrangements(r.conditions, r.groups) for r in records]
     return functools.reduce(util.add, arrangements)
 
 print("Part 1", part1())
+print("Part 2", part2())
