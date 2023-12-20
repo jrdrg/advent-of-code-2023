@@ -895,4 +895,100 @@ def part1():
     accepted = [part for part in parts if process_part(part, workflows) == "A"]
     return functools.reduce(util.add, [part_value(part) for part in accepted])
 
+
+def build_graph(workflows: dict[str, Workflow]):
+    graph = {}
+    queue = [workflows["in"]]
+    while len(queue) > 0:
+        wf = queue.pop(0)
+        if wf == "A" or wf == "R":
+            continue
+        
+        for r in wf.rules:
+            graph[r.workflow] = graph.get(r.workflow, [])
+            graph[r.workflow].append((wf.name, r))
+
+        n = [workflows.get(r.workflow, r.workflow) for r in wf.rules]
+        queue.extend(n)
+
+    return graph
+
+def find_paths(graph: dict[str, list[tuple[str, Rule]]]) -> list[list[tuple[str, str | None]]]:
+    paths = []
+    queue = [(g, []) for g in graph["A"]]
+    while len(queue) > 0:
+        (wf, rule), path  = queue.pop(0)
+        path.append((wf, rule.condition))
+
+        if wf == "in":
+            paths.append(list(reversed(path)))
+            continue
+
+        next_wf = [(g, path) for g in graph[wf]]
+        queue.extend(next_wf)
+
+    return paths
+
+def intersect_range(x: range, y: range):
+    return range(max(x[0], y[0]), min(x[-1], y[-1])+1)
+
+def apply_condition(condition: str, part: dict[str, range]):
+    match condition:
+        case None:
+            return part
+        case c if "<" in c:
+            # x<2000, 1-1999
+            rating, value = c.split("<")
+            part[rating] = intersect_range(part[rating], range(1, int(value)))
+        case c if ">" in c:
+            # x>2000, 2001-4000
+            rating, value = c.split(">")
+            part[rating] = intersect_range(part[rating], range(int(value) + 1, 4001))
+        case _:
+            raise ValueError("Invalid condition:" + condition)
+def apply_opposite_condition(condition: str, part: dict[str, range]):
+    match condition:
+        case None:
+            return part
+        case c if "<" in c:
+            # x<2000, 1-1999
+            rating, value = c.split("<")
+            part[rating] = intersect_range(part[rating], range(int(value), 4001))
+        case c if ">" in c:
+            # x>2000, 2001-4000
+            rating, value = c.split(">")
+            part[rating] = intersect_range(part[rating], range(1, int(value) + 1))
+        case _:
+            raise ValueError("Invalid condition:" + condition)
+
+def get_path_value(path: list[tuple[str, str | None]], workflows: dict[str, Workflow]):
+    init_value = {
+        "x": range(1, 4001),
+        "m": range(1, 4001),
+        "a": range(1, 4001),
+        "s": range(1, 4001)
+    }
+    for wf, condition in path:
+        workflow = workflows.get(wf)
+        for r in workflow.rules:
+            if r.condition == condition:
+                apply_condition(r.condition, init_value)
+                break
+            else:
+                apply_opposite_condition(r.condition, init_value)
+
+    
+    return len(init_value["x"]) * len(init_value["m"]) * len(init_value["a"]) * len(init_value["s"])
+
+def part2():
+    lines = util.get_lines(input_str)
+    workflows, _ = functools.reduce(process_lines, lines, ({}, []))
+
+    graph = build_graph(workflows)
+    paths = find_paths(graph)
+
+    values = [get_path_value(p, workflows) for p in paths]
+    return functools.reduce(util.add, values)
+
 print("Part 1", part1())
+print("Part 2", part2())
